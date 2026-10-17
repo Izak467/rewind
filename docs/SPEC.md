@@ -217,6 +217,18 @@ dropped**. "Credit features to each artist" needs either the Spotify API or the 
 Name-matching (iTunes, Deezer) needs a confidence check and a way for the user to fix a wrong
 match.
 
+### 3.7 iPhone engine check (Phase 0.4, 2026-10-17)
+Tested on an iPhone running iOS 18.7, Safari, with 250k fake plays (the phase0/ page):
+- Loading DuckDB-WASM takes **~12 s** on first load (mostly the ~30 MB download). Import of
+  250k rows: 0.9 s. Queries: 22–149 ms. No crash.
+- Album-art pixels can be read on a canvas in iOS Safari (confirms 0.3 on the real device).
+- **Decision:** DuckDB is NOT on the critical path. Home, Library and the v1 visualizations
+  read precomputed aggregates (daily totals per artist/track/album, weekday×hour cells,
+  record-book stats) built by the parsing worker and stored in IndexedDB, with plain JS
+  filtering. DuckDB lazy-loads in the background after first paint and powers only
+  open-ended queries (Explore, backlog). The PWA service worker caches the DuckDB files so
+  later loads skip the download.
+
 ### 3.4 Inspect the real export first
 Write a small script that summarizes the real export (file list, row count per file,
 date range, null rate per field, distinct platforms and reason codes, a few sample rows
