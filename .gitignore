@@ -1,0 +1,16 @@
+# Real Spotify data — NEVER commit (spec section 1, privacy)
+my_spotify_data*
+*Streaming_History*
+*StreamingHistory*
+Spotify Extended Streaming History/
+Spotify Account Data/
+data-private/
+*.private.*
+inspect-output*
+
+node_modules/
+dist/
+.DS_Store
+.env*
+playwright-report/
+test-results/
