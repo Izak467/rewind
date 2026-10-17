@@ -2,8 +2,8 @@
 
 Phone-first Spotify listening-history explorer. Full spec: [docs/SPEC.md](docs/SPEC.md).
 
-**Current phase:** Phase 1 (data pipeline). Built and tested with fake and real data; waiting on the
-user's iPhone test with the real zip. Phase 0 findings are in SPEC 3.5–3.8; Phase 1 decisions in SPEC 3.9.
+**Current phase:** Phase 2 (`/styleguide`), not started. Phase 1 was approved 2026-10-17: the real zip
+imported correctly on the user's iPhone. Phase 0 findings are in SPEC 3.5–3.8; Phase 1 decisions in SPEC 3.9.
 
 ## Commands
 - `npm test`: unit tests (Vitest). `npm run e2e`: browser test. Needs `npx vite preview --port 4173`
