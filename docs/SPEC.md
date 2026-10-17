@@ -42,9 +42,9 @@ label. Example: "You discover most new artists in September", not "Discoveries b
 ### Privacy (hard requirement)
 - All parsing and storage happen on the device. Listening history never leaves it.
 - Drop `ip_addr` as soon as a file is read. Keep `conn_country` (used for the map).
-- The only network calls go to the Spotify API for track and artist lookups (images and
-  metadata) and send only IDs. MusicBrainz is used as a genre fallback and also receives
-  only IDs or names.
+- The only network calls are metadata lookups (see 3.6): Spotify oEmbed (track IDs), iTunes
+  Search, Deezer and MusicBrainz (artist/album/track names), plus the optional Spotify API.
+  They send only IDs or names, never plays, times or counts.
 - Settings includes "Delete all my data", which clears IndexedDB and the image cache.
 - Never commit the real export, or anything derived from it, to git. Add the export
   folder and patterns like `*Streaming_History*` to `.gitignore` from the first commit.
@@ -189,6 +189,33 @@ names, countries) is ever written into the repo.
   file's name year can differ from its first row's UTC year. Never rely on file names for dates.
 - A full ~10-year export parses in about 3 s in Node on an old Mac (17 files, ~150 MB).
 - The export zip also contains `ReadMeFirst_ExtendedStreamingHistory.pdf`; ignore it.
+
+### 3.6 Metadata sources (Phase 0.2 / 0.3 findings, 2026-10-17)
+The Spotify Web API is no longer the default. For Development Mode apps created after Feb 11,
+2026: the owner needs Premium, there's a 5-user cap, the batch lookups (`GET /tracks`,
+`/artists`, `/albums` with `ids=`) are removed (one item per request only), `popularity` is
+removed from tracks, albums and artists, and search returns at most 10 results. Every call
+needs a login token.
+
+Keyless sources that work from a browser (all tested with an `Origin` header):
+
+| Need | Source | CORS | Notes |
+|---|---|---|---|
+| Album art (exact match) | Spotify oEmbed `open.spotify.com/oembed?url=spotify:track:<id>` | yes `*` | One per request. Returns a 300px `thumbnail_url`; swap the hash prefix `ab67616d00001e02` → `ab67616d0000b273` for 640px. Works for any URI type. |
+| Art pixels for accent color | i.scdn.co / image-cdn-ak.spotifycdn.com, mzstatic.com, dzcdn.net | yes `*` | Canvas reads are allowed with `crossOrigin="anonymous"`. Phase 0.3 passes. |
+| Release date, genre, duration, explicit | iTunes Search API | yes `*` | Matched by artist + track name. Apple documents about 20 calls/min, so fetch by album, most-played first, and cache permanently. Returns one primary genre per item (coarse). |
+| Artist photos | Deezer API search | **no** (JSONP only) | Use `output=jsonp`. The image CDN allows CORS. Matched by artist name. |
+| Fallback dates/genres | MusicBrainz | yes `*` | 1 req/s with a User-Agent. Release dates are less reliable (one test returned a reissue date). |
+
+The Spotify embed page (`open.spotify.com/embed/track/<id>`) has the exact release date,
+duration and every credited artist with URIs, but it doesn't allow CORS, so the app can't read
+it without a proxy. That's the strongest "exact data" option if a tiny stateless proxy is ever
+allowed.
+
+Consequences: no `popularity` from any source, so **Deep cuts (#2) and Mainstream score are
+dropped**. "Credit features to each artist" needs either the Spotify API or the embed page.
+Name-matching (iTunes, Deezer) needs a confidence check and a way for the user to fix a wrong
+match.
 
 ### 3.4 Inspect the real export first
 Write a small script that summarizes the real export (file list, row count per file,

@@ -2,9 +2,8 @@
 
 Phone-first Spotify listening-history explorer. Full spec: [docs/SPEC.md](docs/SPEC.md).
 
-**Current phase:** Phase 0 (technical checks). 0.1 is done: the export was inspected and the
-findings are in SPEC 3.5. Next: metadata source checks (0.2), album-art CORS (0.3), and
-DuckDB-WASM on iPhone Safari (0.4).
+**Current phase:** Phase 0. Done: 0.1 export inspected (SPEC 3.5), 0.2 metadata sources and 0.3 art CORS (SPEC 3.6).
+Next: 0.4, DuckDB-WASM on iPhone Safari (needs a GitHub Pages test page).
 
 ## Environment
 - Personal Mac only, never the work machine. GitHub: Izak467. Git email: isaacschwartz707@gmail.com.
