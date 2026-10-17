@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rewind Phone Check</title>
+<style>
+  :root { --bg:#0B0B0C; --raised:#151517; --text:#F5F5F4; --muted:#A1A1AA; --faint:#52525B; --ok:#4ADE80; --bad:#F87171; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 -apple-system, system-ui, sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:40px; line-height:1.05; letter-spacing:-0.03em; margin:0 0 8px; }
+  p { color:var(--muted); margin:0 0 24px; }
+  .label { font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--faint); margin:32px 0 8px; }
+  button { font:inherit; font-weight:600; width:100%; padding:16px; border:0; border-radius:12px; background:var(--text); color:var(--bg); }
+  button:disabled { opacity:.4; }
+  .row { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid #1E1E21; font-variant-numeric:tabular-nums; }
+  .row span:last-child { text-align:right; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #verdict { font-size:28px; font-weight:700; letter-spacing:-0.02em; margin-top:24px; }
+  img { width:96px; height:96px; border-radius:8px; }
+  pre { white-space:pre-wrap; font-size:12px; color:var(--faint); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Phone check</h1>
+  <p>Tests whether your phone can run Rewind's data engine. Uses made-up plays only. Keep this tab open while it runs (up to a minute).</p>
+  <button id="go">Run the test</button>
+  <div id="verdict"></div>
+  <div class="label">Steps</div>
+  <div id="log"></div>
+  <div class="label">Album art color check</div>
+  <div id="art"></div>
+  <div class="label">Details for Claude</div>
+  <pre id="raw"></pre>
+</main>
+<script type="module">
+const N = 250000;
+const $ = (id) => document.getElementById(id);
+const results = { ua: navigator.userAgent, plays: N };
+function step(name, value, cls = '') {
+  const d = document.createElement('div'); d.className = 'row';
+  d.innerHTML = `<span>${name}</span><span class="${cls}">${value}</span>`;
+  $('log').append(d); results[name] = value;
+}
+const t = () => performance.now();
+const secs = (a) => ((t() - a) / 1000).toFixed(2) + ' s';
+
+async function artCheck() {
+  try {
+    const r = await fetch('https://open.spotify.com/oembed?url=spotify:track:4u7EnebtmKWzUH433cf5Qv');
+    const { thumbnail_url } = await r.json();
+    const img = new Image(); img.crossOrigin = 'anonymous'; img.src = thumbnail_url;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = c.height = 16;
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 16, 16);
+    const px = ctx.getImageData(0, 0, 16, 16).data;
+    let r0 = 0, g0 = 0, b0 = 0; for (let i = 0; i < px.length; i += 4) { r0 += px[i]; g0 += px[i+1]; b0 += px[i+2]; }
+    const n = px.length / 4, col = `rgb(${r0/n|0},${g0/n|0},${b0/n|0})`;
+    $('art').innerHTML = `<div class="row"><img src="${thumbnail_url}" alt=""><span class="ok" style="align-self:center">Read colors: <b style="color:${col}">${col}</b></span></div>`;
+    results.art = 'ok ' + col;
+  } catch (e) {
+    $('art').innerHTML = `<div class="row"><span>Art</span><span class="bad">Failed: ${e.message}</span></div>`;
+    results.art = 'fail ' + e.message;
+  }
+}
+
+function fakeCsv() {
+  // Realistic-ish shape: skewed artist popularity, evening-heavy hours, ~10 years.
+  const artists = 3400, tracksPer = 5, start = Date.UTC(2017, 0, 1), span = 10 * 365 * 864e5;
+  const rows = ['ts,artist,track,ms,platform,shuffle,skipped'];
+  let seed = 42; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++) {
+    const a = Math.floor(artists * Math.pow(rnd(), 3));
+    const day = Math.floor(rnd() * span / 864e5) * 864e5;
+    const hour = Math.floor(24 * Math.pow(rnd(), 0.6));
+    const ts = new Date(start + day + hour * 36e5 + Math.floor(rnd() * 36e5)).toISOString();
+    rows.push(`${ts},Artist ${a},Track ${a}-${Math.floor(rnd() * tracksPer)},${Math.floor(rnd() * 300000)},ios,${rnd() < .85},${rnd() < .14}`);
+  }
+  return rows.join('\n');
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true; $('log').innerHTML = ''; $('verdict').textContent = 'Running…';
+  artCheck();
+  const all = t();
+  try {
+    let a = t();
+    const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm');
+    const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+    const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' }));
+    const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    const conn = await db.connect();
+    step('Load engine', secs(a));
+
+    a = t(); const csv = fakeCsv(); step(`Make ${N.toLocaleString()} fake plays`, secs(a) + ` · ${(csv.length / 1e6).toFixed(0)} MB`);
+    a = t(); await db.registerFileText('plays.csv', csv);
+    await conn.query(`CREATE TABLE plays AS SELECT * FROM read_csv('plays.csv', header=true, columns={'ts':'TIMESTAMP','artist':'VARCHAR','track':'VARCHAR','ms':'INTEGER','platform':'VARCHAR','shuffle':'BOOLEAN','skipped':'BOOLEAN'})`);
+    await db.dropFile('plays.csv');
+    const n = (await conn.query('SELECT count(*)::INT AS n FROM plays')).toArray()[0].n;
+    step('Import into engine', secs(a) + ` · ${n.toLocaleString()} rows`);
+
+    const queries = {
+      'Weekday × hour heatmap': `SELECT dayofweek(ts) d, hour(ts) h, sum(ms) FROM plays GROUP BY 1,2`,
+      'Top 50 artists, one year': `SELECT artist, sum(ms) m FROM plays WHERE ts BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY 1 ORDER BY m DESC LIMIT 50`,
+      'Yearly stat lines': `SELECT year(ts), sum(ms), count(*), count(DISTINCT artist), count(DISTINCT track) FROM plays GROUP BY 1`,
+      'Daily totals (all time)': `SELECT date_trunc('day', ts), sum(ms) FROM plays GROUP BY 1`,
+    };
+    const slow = [];
+    for (const [name, sql] of Object.entries(queries)) {
+      a = t(); await conn.query(sql); const ms = t() - a;
+      if (ms > 500) slow.push(name);
+      step(name, Math.round(ms) + ' ms', ms < 150 ? 'ok' : ms < 500 ? '' : 'bad');
+    }
+    step('Total', secs(all));
+    $('verdict').innerHTML = slow.length
+      ? `<span>Ran, but slow: ${slow.join(', ')}</span>`
+      : `<span class="ok">Passed. Your phone handles it.</span>`;
+    results.verdict = slow.length ? 'slow' : 'pass';
+  } catch (e) {
+    step('Error', e.message, 'bad');
+    $('verdict').innerHTML = `<span class="bad">Failed: ${e.message}</span>`;
+    results.verdict = 'fail';
+  }
+  setTimeout(() => { $('raw').textContent = JSON.stringify(results, null, 1); }, 1500);
+};
+</script>
+</body>
+</html>
