@@ -2,7 +2,14 @@
 
 Phone-first Spotify listening-history explorer. Full spec: [docs/SPEC.md](docs/SPEC.md).
 
-**Current phase:** Phase 0 complete (findings in SPEC 3.5–3.8). Waiting for the go-ahead on Phase 1.
+**Current phase:** Phase 1 (data pipeline). Built and tested with fake and real data; waiting on the
+user's iPhone test with the real zip. Phase 0 findings are in SPEC 3.5–3.8; Phase 1 decisions in SPEC 3.9.
+
+## Commands
+- `npm test`: unit tests (Vitest). `npm run e2e`: browser test. Needs `npx vite preview --port 4173`
+  running and `FAKE_DIR` set to fake files from `npm run fake -- <dir>`.
+- `npm run check-real -- "<zip or folder>"`: run the importer on the real export (terminal output only).
+- `npm run deploy`: build, then publish `dist/` to the gh-pages branch.
 
 ## Environment
 - Personal Mac only, never the work machine. GitHub: Izak467. Git email: isaacschwartz707@gmail.com.
@@ -56,5 +63,5 @@ before anything destructive or public-facing.
 ## Deploy
 GitHub Pages serves the `gh-pages` branch (the saved GitHub login can't push workflow files).
 To publish a folder: `git push origin "$(git subtree split --prefix <folder> HEAD)":refs/heads/gh-pages`.
-Once the Vite app exists, switch to pushing `dist/` to `gh-pages` (e.g. the `gh-pages` npm package).
+`npm run deploy` does this via a temporary git worktree (scripts/deploy.sh).
 Python on this Mac needs `SSL_CERT_FILE=/etc/ssl/cert.pem` for HTTPS.

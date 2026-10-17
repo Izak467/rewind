@@ -189,6 +189,15 @@ names, countries) is ever written into the repo.
   file's name year can differ from its first row's UTC year. Never rely on file names for dates.
 - A full ~10-year export parses in about 3 s in Node on an old Mac (17 files, ~150 MB).
 - The export zip also contains `ReadMeFirst_ExtendedStreamingHistory.pdf`; ignore it.
+- **Video history files have exactly the same fields as audio files**, so only the file name
+  (`Streaming_History_Video_*`) tells them apart. Name-based detection is required here.
+- Device strings also include casting partners: `Partner google cast_tv;Chromecast;…` (TV, and
+  NOT web, despite containing "chrome"), `Partner android_tv Amazon;…` (Fire TV),
+  `Partner amazon_salmon Amazon;Echo_Dot;…` and `cast_voice;Google_Home…` (speakers),
+  `Partner spotify web_player` (web). Some include device serial numbers. Never copy them
+  verbatim into the repo.
+- Byte-identical duplicate rows exist and are dropped. Verified on a real export: the whole-row
+  key produced zero hash collisions.
 
 ### 3.6 Metadata sources (Phase 0.2 / 0.3 findings, 2026-10-17)
 The Spotify Web API is no longer the default. For Development Mode apps created after Feb 11,
@@ -276,6 +285,17 @@ Throughput: Apple allows ~20 calls/min, and most albums verify on the first quer
 (~3 s each). For a heavy listener, the most-played few hundred albums cover most listening
 minutes, so those finish within the first ~15 minutes and the long tail fills in over hours. Run it in the background in most-played order, resumable, cached permanently.
 Prototype: `scripts/phase0/match_proto_v2.py` (port to TypeScript in Phase 5).
+
+### 3.9 Storage and import (Phase 1, 2026-10-17)
+- Private fields dropped on read: `ip_addr`, `ip_addr_decrypted`, `user_agent_decrypted`,
+  `username`.
+- Private Account-data files (Userdata, Payments, Identifiers, …) are recognized **by name** and
+  never decompressed or read. Tests assert this.
+- Plays are stored in IndexedDB as **chunks of 5,000 per record**, plus a small `chunkInfo`
+  table (count and date span per chunk). Storing one record per play took about a minute for
+  200k plays in Chromium. Chunks take about 5 s for 241k plays, including unzip and parse.
+- Start time = `offline_timestamp` when present and plausible (not after `ts`, and within 60
+  days before it), else `ts − ms_played`.
 
 ### 3.4 Inspect the real export first
 Write a small script that summarizes the real export (file list, row count per file,
