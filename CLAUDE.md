@@ -2,8 +2,7 @@
 
 Phone-first Spotify listening-history explorer. Full spec: [docs/SPEC.md](docs/SPEC.md).
 
-**Current phase:** Phase 0. Done: 0.1 export inspected (SPEC 3.5), 0.2 metadata sources and 0.3 art CORS (SPEC 3.6).
-Next: 0.4, DuckDB-WASM on iPhone Safari (needs a GitHub Pages test page).
+**Current phase:** Phase 0 complete (findings in SPEC 3.5–3.8). Waiting for the go-ahead on Phase 1.
 
 ## Environment
 - Personal Mac only, never the work machine. GitHub: Izak467. Git email: isaacschwartz707@gmail.com.
@@ -53,3 +52,9 @@ Next: 0.4, DuckDB-WASM on iPhone Safari (needs a GitHub Pages test page).
 The user isn't a professional developer (business analytics background, some Python and SQL).
 Explain technical choices plainly. Low-risk operations can run without asking; confirm
 before anything destructive or public-facing.
+
+## Deploy
+GitHub Pages serves the `gh-pages` branch (the saved GitHub login can't push workflow files).
+To publish a folder: `git push origin "$(git subtree split --prefix <folder> HEAD)":refs/heads/gh-pages`.
+Once the Vite app exists, switch to pushing `dist/` to `gh-pages` (e.g. the `gh-pages` npm package).
+Python on this Mac needs `SSL_CERT_FILE=/etc/ssl/cert.pem` for HTTPS.

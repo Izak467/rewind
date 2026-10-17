@@ -229,6 +229,54 @@ Tested on an iPhone running iOS 18.7, Safari, with 250k fake plays (the phase0/ 
   open-ended queries (Explore, backlog). The PWA service worker caches the DuckDB files so
   later loads skip the download.
 
+### 3.8 Verified matching rules (Phase 0, tested on a 50-album / 30-artist sample)
+Name-matching against iTunes and Deezer is cross-checked against facts we already know for
+sure, and **a blank beats a wrong answer**: anything unverified shows a placeholder plus a
+"fix this match" action.
+
+Facts we already have for sure:
+- **Exact Spotify cover art** (oEmbed, by track ID). Compare against the candidate's cover with
+  a 64-bit perceptual difference hash (dHash, 9×8 grayscale). Hamming distance ≤ 10 = same
+  cover. This was the strongest single signal in testing.
+- **Song length from the export itself**: the median `ms_played` of that track's plays with
+  `reason_end = trackdone`. Known for ~40% of tracks but **~99% of listening minutes**, so
+  completion % needs no outside data at all. A candidate within ±3 s counts as a length match.
+
+Album rules (iTunes):
+1. Query strategies in order, stopping at the first VERIFIED: song search `"<artist> <top
+   track>"` → album search `"<artist> <album>"` → song search by title only. Use normalized
+   names in the query text (strip "(Deluxe)", "- 2011 Remaster", etc.).
+2. Drop karaoke / tribute / "originally performed by" / cover / lullaby results before scoring.
+3. Artist comparison splits credits on `, & and x with featuring feat. ft.`
+   ("Akon featuring Eminem" contains Akon).
+4. VERIFIED if album name ≥ 0.8 similar AND cover matches AND (artist ≥ 0.85 OR cover distance
+   ≤ 4, which covers aliases like Jeezy / Young Jeezy). Also VERIFIED if artist ≥ 0.85, album ≥
+   0.9 and length matches. LIKELY if artist and album names match but neither check confirms.
+   Everything else is REJECTED.
+5. Release date = the matched album's date. **Don't take the earliest date across candidates**:
+   it produced a 1978 date for a 1985 song in testing. A date of Jan 1 is often a placeholder,
+   so store it with year-only precision. Flag any date that's after the track's first play.
+
+Artist photo rules (Deezer, JSONP):
+- Anchor on songs, not names: search Deezer tracks for the user's top 3 songs by that artist
+  (`artist:"X" track:"Y"`, loose query as fallback), and vote on the artist ID they belong to.
+  VERIFIED with ≥ 2 votes (or all of the user's songs, if they played fewer than 2).
+- Plain name search picked the wrong artist for same-name acts (a 4-fan "Nav" instead of NAV,
+  a different "Bush", a different "Goose").
+
+Test results on the sample (verified answers checked by hand):
+
+| | Albums verified | Wrong but "verified" | Left blank | Artists verified |
+|---|---|---|---|---|
+| Naive top hit | (n/a) | 14 of 50 top hits were the wrong album | 0 | (n/a) |
+| v1 rules | 40 | 1 | 8 | 24 / 30 |
+| v2 rules (above) | **44** | **0** | 6 | **28 / 30** (+1 weak, correct) |
+
+Throughput: Apple allows ~20 calls/min, and most albums verify on the first query. The top
+250 albums (about 60% of a heavy listener's minutes) take ~15 min, and the top 1,000 (~94%)
+take ~1 hour. Run it in the background in most-played order, resumable, cached permanently.
+Prototype: `scripts/phase0/match_proto_v2.py` (port to TypeScript in Phase 5).
+
 ### 3.4 Inspect the real export first
 Write a small script that summarizes the real export (file list, row count per file,
 date range, null rate per field, distinct platforms and reason codes, a few sample rows
