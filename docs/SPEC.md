@@ -248,21 +248,21 @@ Album rules (iTunes):
    names in the query text (strip "(Deluxe)", "- 2011 Remaster", etc.).
 2. Drop karaoke / tribute / "originally performed by" / cover / lullaby results before scoring.
 3. Artist comparison splits credits on `, & and x with featuring feat. ft.`
-   ("Akon featuring Eminem" contains Akon).
+   (a credit like "A featuring B" contains A).
 4. VERIFIED if album name ≥ 0.8 similar AND cover matches AND (artist ≥ 0.85 OR cover distance
-   ≤ 4, which covers aliases like Jeezy / Young Jeezy). Also VERIFIED if artist ≥ 0.85, album ≥
+   ≤ 4, which covers artist aliases such as an old and a new stage name). Also VERIFIED if artist ≥ 0.85, album ≥
    0.9 and length matches. LIKELY if artist and album names match but neither check confirms.
    Everything else is REJECTED.
 5. Release date = the matched album's date. **Don't take the earliest date across candidates**:
-   it produced a 1978 date for a 1985 song in testing. A date of Jan 1 is often a placeholder,
+   in testing it gave a hit single a date seven years too early. A date of Jan 1 is often a placeholder,
    so store it with year-only precision. Flag any date that's after the track's first play.
 
 Artist photo rules (Deezer, JSONP):
 - Anchor on songs, not names: search Deezer tracks for the user's top 3 songs by that artist
   (`artist:"X" track:"Y"`, loose query as fallback), and vote on the artist ID they belong to.
   VERIFIED with ≥ 2 votes (or all of the user's songs, if they played fewer than 2).
-- Plain name search picked the wrong artist for same-name acts (a 4-fan "Nav" instead of NAV,
-  a different "Bush", a different "Goose").
+- Plain name search picked the wrong artist for same-name acts several times in testing (for
+  example, a near-empty duplicate profile instead of the well-known artist).
 
 Test results on the sample (verified answers checked by hand):
 
@@ -272,9 +272,9 @@ Test results on the sample (verified answers checked by hand):
 | v1 rules | 40 | 1 | 8 | 24 / 30 |
 | v2 rules (above) | **44** | **0** | 6 | **28 / 30** (+1 weak, correct) |
 
-Throughput: Apple allows ~20 calls/min, and most albums verify on the first query. The top
-250 albums (about 60% of a heavy listener's minutes) take ~15 min, and the top 1,000 (~94%)
-take ~1 hour. Run it in the background in most-played order, resumable, cached permanently.
+Throughput: Apple allows ~20 calls/min, and most albums verify on the first query
+(~3 s each). For a heavy listener, the most-played few hundred albums cover most listening
+minutes, so those finish within the first ~15 minutes and the long tail fills in over hours. Run it in the background in most-played order, resumable, cached permanently.
 Prototype: `scripts/phase0/match_proto_v2.py` (port to TypeScript in Phase 5).
 
 ### 3.4 Inspect the real export first
